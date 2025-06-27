@@ -5,19 +5,26 @@ RUN apk update && apk add --no-cache build-base gcc autoconf automake zlib-dev l
 ARG NODE_ENV=development
 ENV NODE_ENV=${NODE_ENV}
 
-WORKDIR /opt/app
+WORKDIR /opt/
 COPY package.json package-lock.json ./
 RUN npm install -g node-gyp
-RUN npm config set fetch-retry-maxtimeout 600000 -g
-RUN npm install
+RUN npm config set fetch-retry-maxtimeout 600000 -g && npm install --only=production
+ENV PATH=/opt/node_modules/.bin:$PATH
+WORKDIR /opt/app
 COPY . .
 RUN npm run build
 
-
-FROM node:22-alpine AS runtime
+# Creating final production image
+FROM node:22-alpine
 RUN apk add --no-cache vips-dev bash
+ARG NODE_ENV=development
+ENV NODE_ENV=${NODE_ENV}
+WORKDIR /opt/
+COPY --from=build /opt/node_modules ./node_modules
 WORKDIR /opt/app
-COPY --from=builder /opt/app /opt/app
+COPY --from=build /opt/app ./
+ENV PATH=/opt/node_modules/.bin:$PATH
+
 RUN chown -R node:node /opt/app
 USER node
 EXPOSE 1337
